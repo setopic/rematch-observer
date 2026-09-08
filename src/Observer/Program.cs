@@ -132,7 +132,7 @@ public static class Program
     private static int Match(Args a)
     {
         var c = a.Config();
-        var templates = TemplateSet.Load(c.TemplatesDir);
+        var templates = TemplateSet.Load(c.ResolvedTemplatesDir);
         var frame = Frame.LoadPng(a.Require("--in"));
         var reader = new ScreenReader(templates, c);
         var image = reader.Normalize(frame);
@@ -151,7 +151,7 @@ public static class Program
     private static int Read(Args a)
     {
         var c = a.Config();
-        var templates = TemplateSet.Load(c.TemplatesDir);
+        var templates = TemplateSet.Load(c.ResolvedTemplatesDir);
         var missing = templates.Missing().ToList();
         if (missing.Count > 0) Console.WriteLine("足りないテンプレート: " + string.Join(", ", missing));
         var frame = Frame.LoadPng(a.Require("--in"));
@@ -203,7 +203,7 @@ public static class Program
     private static async Task<int> Watch(Args a)
     {
         var c = a.Config();
-        var templates = TemplateSet.Load(c.TemplatesDir);
+        var templates = TemplateSet.Load(c.ResolvedTemplatesDir);
         var missing = templates.Missing().ToList();
         if (missing.Count > 0)
         {
@@ -244,16 +244,22 @@ public static class Program
         Console.WriteLine($"見つかった : {(window?.ToString() ?? "（今は起動していません）")}");
         Console.WriteLine($"WGC        : {(Capture.IsSupported ? "使えます" : "使えません")}");
 
-        var templates = TemplateSet.Load(c.TemplatesDir);
-        Console.WriteLine($"テンプレート: {Path.GetFullPath(c.TemplatesDir)}"
+        var templates = TemplateSet.Load(c.ResolvedTemplatesDir);
+        Console.WriteLine($"テンプレート: {c.ResolvedTemplatesDir}"
                         + $"（基準の高さ {templates.ReferenceHeight} / ラベル {templates.Labels.Count} 枚 / 数字 {templates.Digits.Count} 枚）");
         var missing = templates.Missing().ToList();
         if (missing.Count > 0) Console.WriteLine("  足りません: " + string.Join(", ", missing));
 
+        // **設定とテンプレートは別々に足りなくなる。** 片方だけ見て「揃った」と言うと、
+        // `watch` が黙って何もしないときに、どちらが原因か分からなくなる
         var problems = c.Problems();
-        Console.WriteLine(problems.Count == 0
-            ? "設定は揃っています"
-            : "設定が足りません:\n  " + string.Join("\n  ", problems));
+        if (problems.Count > 0)
+            Console.WriteLine("設定が足りません:\n  " + string.Join("\n  ", problems));
+        else if (missing.Count > 0)
+            Console.WriteLine("設定は揃っています。ただしテンプレートが無いので、"
+                            + "watch は何も読めません（send は送れます）");
+        else
+            Console.WriteLine("設定もテンプレートも揃っています");
         return problems.Count == 0 && missing.Count == 0 ? 0 : 1;
     }
 

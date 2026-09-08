@@ -41,6 +41,17 @@ public sealed class Config
     /// <summary>テンプレート画像の置き場所。exe からの相対でよい。</summary>
     public string TemplatesDir { get; set; } = "templates";
 
+    /// <summary>
+    /// テンプレートの実際の場所。**相対パスは exe の隣として読む。**
+    ///
+    /// ⚠ **作業ディレクトリ基準にしない。** 常駐はショートカットやスタートアップから
+    /// 起動されうるので、**どこから起動しても同じものを読ませる。**
+    /// 作業ディレクトリ基準だと、**読めないのではなく違うものを読む**ことがある。
+    /// </summary>
+    public string ResolvedTemplatesDir => Path.IsPathRooted(TemplatesDir)
+        ? TemplatesDir
+        : Path.Combine(AppContext.BaseDirectory, TemplatesDir);
+
     /// <summary>ラベルの照合をどこで打ち切るか。**下げると静かに間違える。**</summary>
     public double LabelThreshold { get; set; } = 0.80;
 
