@@ -23,7 +23,7 @@ public sealed class Webhook : IDisposable
     {
         _url = url;
         _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("rematch-observer/1.0 (+https://github.com/setopic/rematch-observer)");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("rematch-observer/1.1 (+https://github.com/setopic/rematch-observer)");
     }
 
     public sealed record Sent(bool Ok, HttpStatusCode Status, string? Reason);
