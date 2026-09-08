@@ -91,7 +91,20 @@ Rematch のアンチチートは **Easy Anti-Cheat** です。**外部プロセ�
 ### 1. 入手する
 
 [Releases](https://github.com/setopic/rematch-observer/releases) から
-`rematch-observer.exe` を落とします。**単一の exe で、.NET の導入は要りません。**
+`rematch-observer.zip` を落として展開します。**.NET の導入は要りません。**
+
+⚠ **中身をそのまま 1 つのフォルダに置いてください。**
+
+```
+rematch-observer/
+  rematch-observer.exe
+  templates/          ← 画面を読むための画像。**別々にしないでください**
+  config.json         ← 初回に作られます
+  README.md
+```
+
+⚠ **`templates/` が exe と同じ場所に無いと、何も読めません。**
+エラーも出ず、ただ何も起きない形で詰まります。
 
 ### 2. 設定する
 
