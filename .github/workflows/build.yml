@@ -56,9 +56,12 @@ jobs:
       - name: 動くかを確かめる
         shell: pwsh
         run: |
-          # 走る環境に .NET があっても無くても同じ結果になるはずのもの
-          & publish/rematch-observer.exe help
-          if ($LASTEXITCODE -ne 0) { throw "help が失敗しました" }
+          # 走る環境に .NET があっても無くても同じ結果になるはずのもの。
+          # ⚠ **WinExe なので `&` では終了を待たず、$LASTEXITCODE が当てにならない。**
+          # **待って、終了コードを見る**（実際にここで落ちた）
+          $p = Start-Process -FilePath publish/rematch-observer.exe -ArgumentList "help" `
+                             -NoNewWindow -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "help が失敗しました（$($p.ExitCode)）" }
 
       - name: 配る形にまとめる
         shell: pwsh

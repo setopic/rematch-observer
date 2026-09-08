@@ -163,6 +163,15 @@ rematch-observer.exe config-init
 **校正（テンプレートの作り直し）はコマンドから行います。**
 引数を付けて実行すると、画面ではなくコマンドとして動きます。
 
+⚠ **プロンプトが先に戻ります。** 画面を出すための作りなので、
+**PowerShell は終了を待ちません。**出力はそのあとに出ます。
+**終了コードを見たいときは待たせてください。**
+
+```
+$p = Start-Process .ematch-observer.exe -ArgumentList "check" -NoNewWindow -Wait -PassThru
+$p.ExitCode
+```
+
 
 ```
 rematch-observer.exe check     設定とテンプレートが揃っているかを見る
