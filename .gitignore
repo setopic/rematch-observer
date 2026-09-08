@@ -3,6 +3,10 @@ obj/
 *.user
 .vs/
 artifacts/
-# 撮った画像はリポジトリに入れない（templates/ の教材だけを手で足す）
+# 撮った画像はリポジトリに入れない（templates/ の切り出しだけを手で足す）
+# ⚠ 既定の出力先はリポジトリの直下になる。**フォルダだけ塞いでも足りない**
 captures/
+capture-*.png
+*.png
+!templates/*.png
 *.local.json

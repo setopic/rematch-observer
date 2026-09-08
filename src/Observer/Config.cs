@@ -107,7 +107,14 @@ public sealed class Config
     /// <summary>赤・緑が青からどれだけ離れていれば黄色とみなすか。</summary>
     public int OutlineMinSpread { get; set; } = 70;
     /// <summary>この画素数に届かなければ「縁取りは出ていない」とみなす。</summary>
-    public int OutlineMinPixels { get; set; } = 400;
+    public int OutlineMinPixels { get; set; } = 1500;
+
+    /// <summary>
+    /// 反対側の何倍あれば「縁取りが出ている側」とみなすか。
+    /// ⚠ **星印と MVP の金色で、縁取りが無くても数百画素は出る**（実画面で確認）。
+    /// **本物の縁取りは行を一周するので桁違いに多い。**
+    /// </summary>
+    public int OutlineDominance { get; set; } = 5;
 
     /// <summary>送らずに画面に出すだけ。**最初の疎通の前に使う。**</summary>
     public bool DryRun { get; set; }

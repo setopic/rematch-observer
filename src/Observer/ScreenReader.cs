@@ -186,10 +186,19 @@ public sealed class ScreenReader
         int home = CountOutline(frame, Scale(homeBand, scale, frame));
         int away = CountOutline(frame, Scale(awayBand, scale, frame));
         trace?.Invoke($"黄色の縁取り: ホーム側 {home} 画素 / アウェイ側 {away} 画素");
+
+        // ⚠ **「片側が閾値を超えたら採用」では雑音で誤判定する。**
+        // 表には**星印**が並び、**MVP の行は金色で塗られる**ので、
+        // **縁取りが無くても黄色の画素は数百単位で出る**（実画面で 496 対 279 を踏んだ）。
+        //
+        // **本物の縁取りは行を一周する**ので、桁違いに多い（同じ実画面で 6196 対 32）。
+        // **多いだけでなく、反対側を大きく引き離していることを求める。**
+        // ⚠ **迷ったら Unknown。** 側を間違えて送ると Bot が観測ごと捨てる（UC-45 A3）。
         int floor = Math.Max(_c.OutlineMinPixels, 1);
-        if (home < floor && away < floor) return Side.Unknown;         // 運営の観戦
-        if (home >= floor && away >= floor) return Side.Unknown;       // 両側に出るのはおかしい
-        return home >= floor ? Side.Home : Side.Away;
+        int more = Math.Max(home, away), less = Math.Min(home, away);
+        if (more < floor) return Side.Unknown;                          // 縁取りが出ていない
+        if (more < less * _c.OutlineDominance) return Side.Unknown;     // 差が足りない
+        return home > away ? Side.Home : Side.Away;
     }
 
     private static Rect Scale(Rect r, double s, Frame frame) => new Rect(
