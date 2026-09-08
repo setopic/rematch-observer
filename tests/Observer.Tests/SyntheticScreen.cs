@@ -29,11 +29,20 @@ public static class SyntheticScreen
 
     private const int Width = 1600, Height = 1080;
     private const int GoalsColumnX = 820, DecoyColumnX = 1180;
+    private const int TimerX = 700, TimerW = 120;
 
     public sealed record Built(Frame Frame, TemplateSet Templates);
 
+    /// <param name="homeScore">
+    /// ヘッダに出す試合の得点。**省略すると選手ゴールと同じ**（オウンゴール無し）。
+    /// ⚠ **本物の画面では一致しないことがある**（CON-09）。
+    /// </param>
+    /// <param name="headerSwapped">ヘッダの左右を入れ替える（視点で入れ替わるため）。</param>
+    /// <param name="withHeader">ヘッダごと描かない（読めないときの振る舞いを見る）。</param>
     public static Built Build(int homeGoals, int awayGoals,
-                              int homeDecoy = 4000, int awayDecoy = 1200, string? gameCode = null)
+                              int homeDecoy = 4000, int awayDecoy = 1200, string? gameCode = null,
+                              int? homeScore = null, int? awayScore = null,
+                              bool headerSwapped = false, bool withHeader = true)
     {
         var rects = new Dictionary<string, Rect>(StringComparer.Ordinal);
         var digitRects = new Dictionary<char, Rect>();
@@ -46,6 +55,9 @@ public static class SyntheticScreen
             g.Clear(Color.FromArgb(255, 38, 40, 46));
             using var font = new Font(FontFamily.GenericSansSerif, 22, FontStyle.Bold, GraphicsUnit.Pixel);
             using var white = new SolidBrush(Color.White);
+
+            if (withHeader)
+                Header(g, font, white, homeScore ?? homeGoals, awayScore ?? awayGoals, headerSwapped);
 
             Section(g, font, white, rects, "home", top: 180, goals: homeGoals, decoy: homeDecoy);
             Section(g, font, white, rects, "away", top: 560, goals: awayGoals, decoy: awayDecoy);
@@ -89,6 +101,25 @@ public static class SyntheticScreen
         // 描いた位置から引き直す。列見出しの中心はレイアウトの定数で決まっている
         var gray = built.Frame.ToGray();
         return gray.Crop(new Rect(DecoyColumnX - 60, 250 - 2, 120, 34));
+    }
+
+    /// <summary>
+    /// ヘッダ。**時計の箱を挟んで左右に得点**が出る、本物と同じ形にする。
+    /// ⚠ **箱がいちばん長い明るい塊である**ことが、読み取り側の手がかりになっている。
+    /// </summary>
+    private static void Header(Graphics g, Font font, Brush brush, int home, int away, bool swapped)
+    {
+        using var box = new SolidBrush(Color.FromArgb(255, 190, 195, 200));
+        using var dark = new SolidBrush(Color.FromArgb(255, 30, 32, 36));
+        // ⚠ **読み取り側は `ホーム` ラベルの高さを基準に帯を切る。**
+        // 本物と同じ比率のところに置かないと、字の上が切れて読めない（試験で踏んだ）
+        g.FillRectangle(box, TimerX, 96, TimerW, 34);
+        g.DrawString("05:00", font, dark, TimerX + 12, 98);
+
+        int left = swapped ? away : home;
+        int right = swapped ? home : away;
+        Centered(g, font, brush, left.ToString(), TimerX - 27, 100);
+        Centered(g, font, brush, right.ToString(), TimerX + TimerW + 27, 100);
     }
 
     private static void Section(Graphics g, Font font, Brush brush, Dictionary<string, Rect> rects,

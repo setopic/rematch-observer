@@ -102,6 +102,23 @@ public sealed class Config
     /// </summary>
     public double CodeHeightScale { get; set; } = 1.8;
 
+    // ---- ヘッダ（試合の得点。CON-09） --------------------------------------
+    // ⚠ **ヘッダには文字のラベルが無い。** ほかの読み場所と違い、位置に頼っている。
+    // **画面の作りが変わったとき、ここが先に壊れる見込みである。**
+    // 倍率はすべて `ホーム` ラベルの高さを 1 とした値。
+
+    /// <summary>`ホーム` ラベルの何倍ぶん上から見るか。</summary>
+    public double HeaderTopScale { get; set; } = 4.0;
+
+    /// <summary>同じく、どこまでで打ち切るか。</summary>
+    public double HeaderBottomScale { get; set; } = 2.0;
+
+    /// <summary>時計の箱の左右、何倍ぶんを数字として見るか。**広げるとアイコンを巻き込む。**</summary>
+    public double HeaderNumberScale { get; set; } = 2.0;
+
+    /// <summary>列の何割が明るければ「時計の箱」とみなすか。</summary>
+    public int TimerBrightPercent { get; set; } = 30;
+
     // ---- 黄色の縁取り（detectSide が true のときだけ使う） ------------------
     // ⚠ **緑の背景は使わない。**あれはゲーム内で選択している選手に付くもので、
     // **運営の観戦では他人の行に付く**（CON-09）。

@@ -98,8 +98,95 @@ public sealed class ScreenReader
         int? a = ReadCell(image, awayBand, goals, "アウェイ", trace);
         if (h is null || a is null) return null;
 
+        // ⚠ **ここまでで読んだのは選手ゴールの合計であって、試合の得点ではない**（CON-09）。
+        // **オウンゴールが入っていない。**得点はヘッダから取る
+        var score = ReadScore(image, home.Value, h.Value, a.Value, trace);
+        if (score is null) return null;
+
         var side = _c.DetectSide ? DetectSide(frame, image, homeBand, awayBand, trace) : Side.Unknown;
-        return new ResultReading(h.Value, a.Value, side);
+        return new ResultReading(score.Value.Home, score.Value.Away, side);
+    }
+
+    /// <summary>
+    /// ヘッダから試合の得点を取り、`合計マッチ数` で向きを決める（CON-09）。
+    ///
+    /// **ヘッダには本当の得点が出ているが、どちらがホームかは分からない。**
+    /// 並びは視点で入れ替わり、**色も当てにならない**（実画面 3 枚のうち 1 枚が逆だった）。
+    ///
+    /// **決め手はこの不等式である。**
+    /// **どのチームの得点も、そのチームの選手ゴールの合計を下回らない。**
+    /// オウンゴールは相手の得点を増やすだけで、自分の選手ゴールを減らさない。
+    ///
+    /// ⚠ **1 通りに定まったときだけ採る。** 両方成り立つなら捨てる。
+    /// </summary>
+    private (int Home, int Away)? ReadScore(GrayImage image, Hit homeLabel,
+                                            int homePlayerGoals, int awayPlayerGoals,
+                                            Action<string>? trace)
+    {
+        int unit = Math.Max(1, homeLabel.Where.H);
+        var strip = new Rect(0, homeLabel.Where.Y - (int)(unit * _c.HeaderTopScale), image.Width,
+                             Math.Max(1, (int)(unit * (_c.HeaderTopScale - _c.HeaderBottomScale))));
+
+        // ⚠ **ヘッダには文字のラベルが無い**（CON-09）。**時計の箱を手がかりにする。**
+        // 帯の中でいちばん長い「明るい列の連なり」がそれで、
+        // **アイコンより桁違いに長い**ので取り違えない。
+        // **箱そのものを読み取りから外せる**利点もある（中の時刻を得点と間違えない）。
+        var timer = FindTimer(image, strip);
+        if (timer is null) { trace?.Invoke("ヘッダの時計が見つかりません"); return null; }
+
+        int width = Math.Max(1, (int)(unit * _c.HeaderNumberScale));
+        var left = new Rect(timer.Value.From - width, strip.Y, width, strip.H);
+        var right = new Rect(timer.Value.To + 1, strip.Y, width, strip.H);
+
+        var digits = _t.HeaderDigits.Count > 0
+            ? (IReadOnlyDictionary<char, Template>)_t.HeaderDigits
+            : DigitReader.FitTo(_t.Digits, image, left, _c.InkThreshold);
+        var one = DigitReader.Read(image, left, digits, _c.DigitThreshold, 3, _c.InkThreshold);
+        var two = DigitReader.Read(image, right, digits, _c.DigitThreshold, 3, _c.InkThreshold);
+        trace?.Invoke($"ヘッダ: 時計 {timer.Value.From}..{timer.Value.To} "
+                    + $"左 {left} → {one ?? "読めません"} / 右 {right} → {two ?? "読めません"}");
+        if (one is null || two is null) return null;
+        if (!int.TryParse(one, out int x) || !int.TryParse(two, out int y)) return null;
+
+        bool asIs = x >= homePlayerGoals && y >= awayPlayerGoals;
+        bool swapped = y >= homePlayerGoals && x >= awayPlayerGoals;
+        if (asIs == swapped)
+        {
+            trace?.Invoke(asIs
+                ? $"ヘッダの向きが決まりません（{x} と {y} のどちらでも成り立つ）"
+                : $"ヘッダ {x}-{y} と選手ゴール {homePlayerGoals}/{awayPlayerGoals} が矛盾します");
+            return null;
+        }
+        var picked = asIs ? (Home: x, Away: y) : (Home: y, Away: x);
+        trace?.Invoke($"得点: ホーム {picked.Home} / アウェイ {picked.Away}"
+                    + $"（選手ゴール {homePlayerGoals} / {awayPlayerGoals}）");
+        return picked;
+    }
+
+    /// <summary>帯の中でいちばん長い「明るい列の連なり」。**時計の箱を指す。**</summary>
+    private (int From, int To)? FindTimer(GrayImage image, Rect where)
+    {
+        var area = where.ClampTo(image.Width, image.Height);
+        if (area.W <= 0 || area.H <= 0) return null;
+        int best = 0, bestFrom = -1, from = -1;
+        for (int x = area.X; x <= area.Right; x++)
+        {
+            bool solid = false;
+            if (x < area.Right)
+            {
+                int bright = 0;
+                for (int y = area.Y; y < area.Bottom; y++) if (image[x, y] >= _c.InkThreshold) bright++;
+                solid = bright * 100 >= area.H * _c.TimerBrightPercent;
+            }
+            if (solid) { if (from < 0) from = x; }
+            else if (from >= 0)
+            {
+                if (x - from > best) { best = x - from; bestFrom = from; }
+                from = -1;
+            }
+        }
+        // **アイコンは短い。** 短すぎる連なりは時計ではない
+        return best < area.H ? null : (bestFrom, bestFrom + best - 1);
     }
 
     private static string Fmt(Hit? hit) => hit is null ? "無し" : hit.Value.Score.ToString("F3");
@@ -284,6 +371,43 @@ public static class DigitReader
     public static string? Read(GrayImage image, Rect where, IReadOnlyDictionary<char, Template> digits,
                                double threshold, int maxDigits, int inkThreshold = 150)
     {
+        var found = Locate(image, where, digits, threshold, maxDigits, inkThreshold);
+        return found is null ? null : new string(found.Select(t => t.Digit).ToArray());
+    }
+
+    /// <summary>
+    /// 枠の中の数字を、**離れている塊ごとに**読む。
+    ///
+    /// **ヘッダには数字が 2 つ並んでいる**（間に時計がある）。
+    /// **繋げて読むと 1 つの数に化ける**ので、隙間で分ける。
+    /// </summary>
+    public static List<string>? ReadGroups(GrayImage image, Rect where,
+                                           IReadOnlyDictionary<char, Template> digits,
+                                           double threshold, int maxDigits, int inkThreshold, int gap)
+    {
+        var found = Locate(image, where, digits, threshold, maxDigits, inkThreshold);
+        if (found is null) return null;
+        var groups = new List<string>();
+        var current = new System.Text.StringBuilder();
+        int previousEnd = -1;
+        foreach (var t in found)
+        {
+            if (previousEnd >= 0 && t.X - previousEnd > gap)
+            {
+                groups.Add(current.ToString());
+                current.Clear();
+            }
+            current.Append(t.Digit);
+            previousEnd = t.X + t.W;
+        }
+        if (current.Length > 0) groups.Add(current.ToString());
+        return groups;
+    }
+
+    private static List<(int X, int W, char Digit)>? Locate(
+        GrayImage image, Rect where, IReadOnlyDictionary<char, Template> digits,
+        double threshold, int maxDigits, int inkThreshold)
+    {
         var area = where.ClampTo(image.Width, image.Height);
         if (area.W <= 0 || area.H <= 0) return null;
 
@@ -325,6 +449,6 @@ public static class DigitReader
         }
 
         taken.Sort((a, b) => a.X.CompareTo(b.X));
-        return new string(taken.Select(t => t.Digit).ToArray());
+        return taken;
     }
 }

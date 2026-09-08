@@ -40,8 +40,15 @@ public sealed class TemplateSet
 
     public Dictionary<string, Template> Labels { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>リザルトの表の数字（太字）。</summary>
+    /// <summary>リザルトの表の `合計マッチ数` の行の数字（18 画素の太字）。</summary>
     public Dictionary<char, Template> Digits { get; } = new();
+
+    /// <summary>
+    /// ヘッダの得点の数字（15 画素）。**選手の行と同じ大きさ・字体である**
+    /// （2026-09-08 に実画面で確認）ので、選手の行から取ってよい。
+    /// 空なら <see cref="Digits"/> を縮めて代用する。
+    /// </summary>
+    public Dictionary<char, Template> HeaderDigits { get; } = new();
 
     /// <summary>
     /// ゲームコードの数字。**表とは別の字体である**（細身で、大きさも違う）。
@@ -90,7 +97,10 @@ public sealed class TemplateSet
         {
             var name = Path.GetFileNameWithoutExtension(path);
             var gray = Frame.LoadPng(path).ToGray();
-            if (name.StartsWith("code-digit-", StringComparison.Ordinal) && name.Length == 12
+            if (name.StartsWith("header-digit-", StringComparison.Ordinal) && name.Length == 14
+                && char.IsAsciiDigit(name[13]))
+                set.HeaderDigits[name[13]] = new Template(name, gray);
+            else if (name.StartsWith("code-digit-", StringComparison.Ordinal) && name.Length == 12
                 && char.IsAsciiDigit(name[11]))
                 set.CodeDigits[name[11]] = new Template(name, gray);
             else if (name.StartsWith("digit-", StringComparison.Ordinal) && name.Length == 7

@@ -69,6 +69,58 @@ public class ReadingTests
     }
 
     [Fact]
+    public void オウンゴールはヘッダから拾う()
+    {
+        // ⚠ **`合計マッチ数` にオウンゴールが入らない**（CON-09。実画面で確認）。
+        // ホームは 1 点入れているのに、選手ゴールの合計は 0 である。
+        // **表だけを読むと 0-2 と報告してしまう。**
+        var built = SyntheticScreen.Build(homeGoals: 0, awayGoals: 2, homeScore: 1, awayScore: 2);
+        var result = new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame);
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.HomeGoals);
+        Assert.Equal(2, result.AwayGoals);
+    }
+
+    [Fact]
+    public void ヘッダの左右が入れ替わっても同じ答えになる()
+    {
+        // **並びは視点で入れ替わる**（CON-09）。**位置では決めない。**
+        // 決め手は「どのチームの得点も、選手ゴールの合計を下回らない」
+        var normal = SyntheticScreen.Build(homeGoals: 0, awayGoals: 2, homeScore: 1, awayScore: 2);
+        var swapped = SyntheticScreen.Build(homeGoals: 0, awayGoals: 2, homeScore: 1, awayScore: 2,
+                                            headerSwapped: true);
+        var a = new ScreenReader(normal.Templates, Tuned()).ReadResult(normal.Frame);
+        var b = new ScreenReader(swapped.Templates, Tuned()).ReadResult(swapped.Frame);
+        Assert.Equal("ホーム 1 - アウェイ 2（側: -）", a!.ToString());
+        Assert.Equal(a.ToString(), b!.ToString());
+    }
+
+    [Fact]
+    public void 向きが決まらなければ捨てる()
+    {
+        // 選手ゴールが 0-0 だと、ヘッダの 1-2 はどちらにも割り当てられる。
+        // ⚠ **静かに間違えるくらいなら捨てる**
+        var built = SyntheticScreen.Build(homeGoals: 0, awayGoals: 0, homeScore: 1, awayScore: 2);
+        Assert.Null(new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame));
+    }
+
+    [Fact]
+    public void ヘッダと選手ゴールが矛盾すれば捨てる()
+    {
+        // 選手ゴールのほうが得点より多い、という画面は読み違えている
+        var built = SyntheticScreen.Build(homeGoals: 3, awayGoals: 3, homeScore: 1, awayScore: 2);
+        Assert.Null(new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame));
+    }
+
+    [Fact]
+    public void ヘッダが読めなければ_表だけで送らない()
+    {
+        // ⚠ **表だけで送ると、オウンゴールのぶんが落ちたまま記録される**（CON-09）
+        var built = SyntheticScreen.Build(homeGoals: 2, awayGoals: 1, withHeader: false);
+        Assert.Null(new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame));
+    }
+
+    [Fact]
     public void 結果の画面でなければ_読めないと言う()
     {
         // **静かに間違えるのではなく、読めなければ捨てる**（CON-09）
