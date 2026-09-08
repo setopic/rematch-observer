@@ -21,6 +21,8 @@ public static class Program
                                            （--delay で待ってから、--count で続けて）
           crop --in <png> --rect x,y,w,h --out <png>
                                            テンプレートを切り出す
+          slice --in <png> --rect x,y,w,h --out <前置き>
+                                           枠の中の数字を字ごとに切り分ける
           match --in <png>                 その画像でラベルがどこに当たるかを見る
           read  --in <png>                 その画像から値を読む（送らない）
           send  --code <6 桁> | --score <ホーム> <アウェイ>
@@ -49,6 +51,7 @@ public static class Program
                 "windows" => Windows(),
                 "capture" => await CaptureOne(a),
                 "crop" => Crop(a),
+                "slice" => Slice(a),
                 "match" => Match(a),
                 "read" => Read(a),
                 "send" => await Send(a),
@@ -155,6 +158,65 @@ public static class Program
         Console.WriteLine($"{rect} を切り出しました → {Path.GetFullPath(outPath)}（{piece.Width}x{piece.Height}）");
         Console.WriteLine($"⚠ この画像を切り出した画面の高さは {frame.Height} です。"
                         + $"templates/templates.json の referenceHeight をこの値に合わせてください");
+        return 0;
+    }
+
+    /// <summary>
+    /// 枠の中の数字を、字ごとに切り分けて保存する。
+    ///
+    /// **目分量で桁を切ると隣が混ざる**（実際に 3 枚とも混ざった）。
+    /// **字と字のあいだの隙間を見て切る。**
+    ///
+    /// **高さは枠全体で揃える。** 字ごとに詰めると `1` だけ細くなり、
+    /// **テンプレートの大きさが揃わなくなる。**
+    /// </summary>
+    private static int Slice(Args a)
+    {
+        var frame = Frame.LoadPng(a.Require("--in"));
+        var area = Rect.Parse(a.Require("--rect")).ClampTo(frame.Width, frame.Height);
+        var prefix = a.Value("--out") ?? "glyph";
+        int threshold = Number(a.Value("--threshold"), 150);
+        int margin = Number(a.Value("--margin"), 1);
+        var gray = frame.ToGray();
+
+        bool InkColumn(int x)
+        {
+            for (int y = area.Y; y < area.Bottom; y++) if (gray[x, y] >= threshold) return true;
+            return false;
+        }
+        bool InkRow(int y)
+        {
+            for (int x = area.X; x < area.Right; x++) if (gray[x, y] >= threshold) return true;
+            return false;
+        }
+
+        int top = -1, bottom = -1;
+        for (int y = area.Y; y < area.Bottom; y++)
+            if (InkRow(y)) { if (top < 0) top = y; bottom = y; }
+        if (top < 0) { Console.WriteLine("この枠には字がありません（--threshold を下げてみてください）"); return 1; }
+
+        var runs = new List<(int From, int To)>();
+        int start = -1;
+        for (int x = area.X; x < area.Right; x++)
+        {
+            if (InkColumn(x)) { if (start < 0) start = x; }
+            else if (start >= 0) { runs.Add((start, x - 1)); start = -1; }
+        }
+        if (start >= 0) runs.Add((start, area.Right - 1));
+
+        Console.WriteLine($"字の高さ: y {top}..{bottom}（{bottom - top + 1} 画素）");
+        int n = 0;
+        foreach (var (from, to) in runs)
+        {
+            n++;
+            var cut = new Rect(from - margin, top - margin,
+                               to - from + 1 + margin * 2, bottom - top + 1 + margin * 2);
+            var path = $"{prefix}-{n:D2}.png";
+            frame.Crop(cut).SavePng(path);
+            Console.WriteLine($"  {n,2}  {cut}  → {path}");
+        }
+        Console.WriteLine($"{n} 個に切りました。**要るものだけ `digit-N.png` に名前を変えてください**");
+        Console.WriteLine("⚠ 桁区切りの `,` も 1 個に数えられます。捨ててください");
         return 0;
     }
 

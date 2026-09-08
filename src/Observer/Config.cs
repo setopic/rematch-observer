@@ -67,6 +67,12 @@ public sealed class Config
     public double DigitThreshold { get; set; } = 0.85;
 
     /// <summary>
+    /// 「字がある」とみなす明るさ。**読み落としの検出に使う。**
+    /// 当たらなかった字が枠に残っていたら、その読みごと捨てる。
+    /// </summary>
+    public int InkThreshold { get; set; } = 150;
+
+    /// <summary>
     /// 同じ値が何回続いたら送るか。**画面の切り替わりの途中を読まないための待ち。**
     /// ⚠ **誰も数字を見ないので**（ADR-0067）、ここが唯一の事前の防御である。
     /// </summary>

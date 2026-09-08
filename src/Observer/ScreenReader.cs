@@ -138,7 +138,7 @@ public sealed class ScreenReader
             Math.Max(1, (int)(column.Where.W * _c.CellWidthScale)),
             Math.Max(1, (int)(row.Where.H * _c.CellHeightScale)));
 
-        var text = DigitReader.Read(image, cell, _t, _c.DigitThreshold, maxDigits: 3);
+        var text = DigitReader.Read(image, cell, _t, _c.DigitThreshold, 3, _c.InkThreshold);
         trace?.Invoke($"{what}: 枠 {cell} → {(text ?? "読めません")}");
         if (text is null || !int.TryParse(text, out int value)) return null;
         return value;
@@ -165,7 +165,7 @@ public sealed class ScreenReader
             Math.Max(1, (int)(hit.Value.Where.H * _c.CodeWidthScale)),
             Math.Max(1, (int)(hit.Value.Where.H * 1.6)));
 
-        var text = DigitReader.Read(image, band, _t, _c.DigitThreshold, maxDigits: 8);
+        var text = DigitReader.Read(image, band, _t, _c.DigitThreshold, 8, _c.InkThreshold);
         trace?.Invoke($"ゲームコード: ラベル {hit.Value.Where} {hit.Value.Score:F3} 枠 {band} → {text ?? "読めません"}");
         if (text is null || text.Length != 6) return null;
         return new CodeReading(text);
@@ -219,7 +219,7 @@ public sealed class ScreenReader
 public static class DigitReader
 {
     public static string? Read(GrayImage image, Rect where, TemplateSet templates,
-                               double threshold, int maxDigits)
+                               double threshold, int maxDigits, int inkThreshold = 150)
     {
         var area = where.ClampTo(image.Width, image.Height);
         if (area.W <= 0 || area.H <= 0) return null;
@@ -241,6 +241,26 @@ public static class DigitReader
             if (taken.Count >= maxDigits) break;
         }
         if (taken.Count == 0) return null;
+
+        // ⚠ **字があるのに当たらなかった所が残っていたら捨てる。**
+        //
+        // これが無いと、**読めなかった桁が黙って落ちる。**
+        // `4` のテンプレートが無いときに `14` を `1` と読むことになり、
+        // **読めないのではなく間違った値が記録される**（CON-09 が最も避けたい形）。
+        //
+        // **実際に起きうる。** `4` は合計マッチ数の行に出ないことがあり、
+        // そのときテンプレートを作れない（2026-09-08 に実画面で確認）。
+        // ⚠ **塊ではなく 1 列ずつ見る。** 隣り合う数字はくっついて 1 つの塊になるので、
+        // 「塊のどこかに当たっていればよい」では `14` の `4` を見逃す（試験で踏んだ）。
+        const int slack = 2;                        // 縁のぼやけぶんだけ緩める
+        for (int x = area.X; x < area.Right; x++)
+        {
+            bool ink = false;
+            for (int y = area.Y; y < area.Bottom && !ink; y++) ink = image[x, y] >= inkThreshold;
+            if (!ink) continue;
+            if (!taken.Any(t => x >= t.X - slack && x < t.X + t.W + slack)) return null;
+        }
+
         taken.Sort((a, b) => a.X.CompareTo(b.X));
         return new string(taken.Select(t => t.Digit).ToArray());
     }

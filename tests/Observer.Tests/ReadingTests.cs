@@ -99,6 +99,26 @@ public class ReadingTests
     }
 
     [Fact]
+    public void 読めない桁が混じったら_短い数として読まない()
+    {
+        // ⚠ **これが最も危ない壊れ方である。**
+        // `4` のテンプレートが無いとき、`14` を `1` と読んで**そのまま記録されうる。**
+        // **読めないのではなく、間違った値が入る。**
+        //
+        // **実際に起きうる。** `4` は合計マッチ数の行に出ないことがあり、
+        // そのときテンプレートを作れない（2026-09-08 に実画面で確認）。
+        var built = SyntheticScreen.Build(homeGoals: 14, awayGoals: 0);
+        var withoutFour = new ScreenReader(built.Templates, Tuned());
+        Assert.Equal(14, withoutFour.ReadResult(built.Frame)!.HomeGoals);   // 揃っていれば読める
+
+        // **枚数は 10 のままにする。** 減らすと「足りない」で弾かれてしまい、
+        // **確かめたい経路を通らない。** 当たらないテンプレートに差し替える
+        built.Templates.Digits['4'] = new Template("digit-4", new GrayImage(12, 18, new byte[12 * 18]));
+        Assert.True(built.Templates.HasDigits);
+        Assert.Null(new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame));
+    }
+
+    [Fact]
     public void 数字のテンプレートが無ければ読まない()
     {
         var built = SyntheticScreen.Build(homeGoals: 1, awayGoals: 0);
