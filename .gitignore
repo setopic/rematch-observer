@@ -1,0 +1,8 @@
+bin/
+obj/
+*.user
+.vs/
+artifacts/
+# 撮った画像はリポジトリに入れない（templates/ の教材だけを手で足す）
+captures/
+*.local.json
