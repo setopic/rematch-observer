@@ -32,8 +32,16 @@ public sealed class Config
     /// </summary>
     public int? MatchId { get; set; }
 
-    /// <summary>撮る相手。**プロセス名を先に見る**（タイトルより変わりにくい）。</summary>
-    public string ProcessName { get; set; } = "Rematch";
+    /// <summary>
+    /// 撮る相手。**プロセス名を先に見る**（タイトルより変わりにくい）。
+    ///
+    /// ⚠ **`Rematch` では見つからない。** Unreal のプロジェクト名が `Runtime` なので、
+    /// **ウィンドウを持っているのは `RuntimeClient-Win64-Shipping`** である
+    /// （Steam のフォルダ名だけが `Rematch`）。
+    /// 部分一致で探すので `RuntimeClient` で足りる。
+    /// **同じ罠がログの置き場所にもある**（`%LOCALAPPDATA%\Runtime\Saved\Logs`）。
+    /// </summary>
+    public string ProcessName { get; set; } = "RuntimeClient";
     public string? WindowTitle { get; set; }
 
     public int PollIntervalMs { get; set; } = 1500;

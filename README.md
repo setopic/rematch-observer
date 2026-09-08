@@ -251,7 +251,7 @@ Bot 側がコードを入れ直すたびに**両チームの準備完了を白�
 | `botUserId` | `1539187275068473434` | メンションする相手 |
 | `senderDiscordId` | （空） | 自分の Discord の id |
 | `matchId` | （無し） | 見ている対戦。**運営には要る** |
-| `processName` | `Rematch` | 撮る相手のプロセス名 |
+| `processName` | `RuntimeClient` | 撮る相手のプロセス名。⚠ **`Rematch` ではありません**（下記） |
 | `windowTitle` | （無し） | 絞り込むときだけ |
 | `pollIntervalMs` | `1500` | 何ミリ秒ごとに見るか |
 | `templatesDir` | `templates` | テンプレートの置き場所 |
@@ -262,6 +262,20 @@ Bot 側がコードを入れ直すたびに**両チームの準備完了を白�
 | `codeWidthScale` | `8.0` | ゲームコードを探す幅 |
 | `detectSide` | `false` | 黄色の縁取りから自分の側を読むか |
 | `dryRun` | `false` | 送らずに本文だけ出す |
+
+### ⚠ プロセス名は `Rematch` ではありません
+
+Unreal のプロジェクト名が `Runtime` なので、**ウィンドウを持っているのは
+`RuntimeClient-Win64-Shipping.exe`** です。`Rematch` なのは Steam のフォルダ名だけです。
+
+  Rematch/RuntimeClient.exe                             起動用
+  Rematch/Runtime/Binaries/Win64/RuntimeClient-Win64-Shipping.exe   本体
+  Rematch/start_protected_game.exe                      EasyAntiCheat の launcher
+
+部分一致で探すので `RuntimeClient` で足ります。
+**確かめるならゲームを起動して `windows` を打ってください。**
+
+**同じ罠がログの置き場所にもあります**（`%LOCALAPPDATA%\Runtime\Saved\Logs`）。
 
 ### `detectSide` について
 
