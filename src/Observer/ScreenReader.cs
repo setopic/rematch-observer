@@ -138,7 +138,7 @@ public sealed class ScreenReader
             Math.Max(1, (int)(column.Where.W * _c.CellWidthScale)),
             Math.Max(1, (int)(row.Where.H * _c.CellHeightScale)));
 
-        var text = DigitReader.Read(image, cell, _t, _c.DigitThreshold, 3, _c.InkThreshold);
+        var text = DigitReader.Read(image, cell, _t.Digits, _c.DigitThreshold, 3, _c.InkThreshold);
         trace?.Invoke($"{what}: 枠 {cell} → {(text ?? "読めません")}");
         if (text is null || !int.TryParse(text, out int value)) return null;
         return value;
@@ -159,14 +159,26 @@ public sealed class ScreenReader
         var hit = Matcher.FindBest(image, label.Image, _c.LabelThreshold);
         if (hit is null) { trace?.Invoke("`ゲームコード` のラベルが出ていません"); return null; }
 
+        // ⚠ **コードはラベルの「下の行」にある**（2026-09-08 に実画面で確認）。
+        // 右を探しても見つからない
         var band = new Rect(
-            hit.Value.Where.Right,
-            hit.Value.Where.Y - (int)(hit.Value.Where.H * 0.3),
+            hit.Value.Where.X,
+            hit.Value.Where.Bottom,
             Math.Max(1, (int)(hit.Value.Where.H * _c.CodeWidthScale)),
-            Math.Max(1, (int)(hit.Value.Where.H * 1.6)));
+            Math.Max(1, (int)(hit.Value.Where.H * _c.CodeHeightScale)));
 
-        var text = DigitReader.Read(image, band, _t, _c.DigitThreshold, 8, _c.InkThreshold);
-        trace?.Invoke($"ゲームコード: ラベル {hit.Value.Where} {hit.Value.Score:F3} 枠 {band} → {text ?? "読めません"}");
+        // ⚠ **リザルトの表とは字の大きさが違う**（表 18 画素 / コード 14 画素）。
+        // **場面ごとにテンプレートを縮めて合わせる。**
+        // もう 1 組テンプレートを作る手もあるが、
+        // **10 種類の数字が出るコードを何回も引かせることになる。**
+        // **専用の組があればそれを使う。** 無ければ表の数字で代用する（当たらない見込み）
+        var digits = _t.CodeDigits.Count > 0
+            ? (IReadOnlyDictionary<char, Template>)_t.CodeDigits
+            : DigitReader.FitTo(_t.Digits, image, band, _c.InkThreshold);
+        var text = DigitReader.Read(image, band, digits, _c.DigitThreshold, 8, _c.InkThreshold);
+        trace?.Invoke($"ゲームコード: ラベル {hit.Value.Where} {hit.Value.Score:F3} 枠 {band}"
+                    + $" 字の高さ {DigitReader.InkHeight(image, band, _c.InkThreshold)}"
+                    + $" → {text ?? "読めません"}");
         if (text is null || text.Length != 6) return null;
         return new CodeReading(text);
     }
@@ -227,14 +239,56 @@ public sealed class ScreenReader
 /// </summary>
 public static class DigitReader
 {
-    public static string? Read(GrayImage image, Rect where, TemplateSet templates,
+    /// <summary>枠の中で字が占めている高さ。**0 なら字が無い。**</summary>
+    public static int InkHeight(GrayImage image, Rect where, int threshold)
+    {
+        var area = where.ClampTo(image.Width, image.Height);
+        int top = -1, bottom = -1;
+        for (int y = area.Y; y < area.Bottom; y++)
+        {
+            bool ink = false;
+            for (int x = area.X; x < area.Right && !ink; x++) ink = image[x, y] >= threshold;
+            if (ink) { if (top < 0) top = y; bottom = y; }
+        }
+        return top < 0 ? 0 : bottom - top + 1;
+    }
+
+    /// <summary>
+    /// 枠の中の字の大きさに合わせて、テンプレートを縮めた組を作る。
+    ///
+    /// **同じ書体でも場面で大きさが違う**（リザルトの表は 18 画素、
+    /// ゲームコードは 14 画素）。**縮小は面積の平均なので崩れにくい。**
+    /// ⚠ **拡大はしない。** 情報が増えるわけではなく、当たりが甘くなるだけである。
+    /// </summary>
+    public static IReadOnlyDictionary<char, Template> FitTo(
+        IReadOnlyDictionary<char, Template> digits, GrayImage image, Rect where, int threshold)
+    {
+        int target = InkHeight(image, where, threshold);
+        // ⚠ **画像の高さではなく字の高さで比べる。** テンプレートは余白を含んでいる
+        int source = digits.Values
+            .Select(t => InkHeight(t.Image, new Rect(0, 0, t.Image.Width, t.Image.Height), threshold))
+            .DefaultIfEmpty(0).Max();
+        if (target <= 0 || source <= 0 || target >= source) return digits;
+
+        double ratio = (double)target / source;
+        var fitted = new Dictionary<char, Template>();
+        foreach (var (digit, template) in digits)
+        {
+            int w = Math.Max(1, (int)Math.Round(template.Image.Width * ratio));
+            int h = Math.Max(1, (int)Math.Round(template.Image.Height * ratio));
+            fitted[digit] = new Template(template.Name, template.Image.Resize(w, h));
+        }
+        return fitted;
+    }
+
+    public static string? Read(GrayImage image, Rect where, IReadOnlyDictionary<char, Template> digits,
                                double threshold, int maxDigits, int inkThreshold = 150)
     {
         var area = where.ClampTo(image.Width, image.Height);
         if (area.W <= 0 || area.H <= 0) return null;
 
         var found = new List<(int X, char Digit, double Score)>();
-        foreach (var (digit, template) in templates.Digits)
+        foreach (var (digit, template) in digits)
             foreach (var hit in Matcher.FindAll(image, template.Image, threshold, maxDigits, area))
                 found.Add((hit.Where.X, digit, hit.Score));
         if (found.Count == 0) return null;
@@ -244,7 +298,7 @@ public static class DigitReader
         var taken = new List<(int X, int W, char Digit)>();
         foreach (var f in found)
         {
-            int w = templates.Digits[f.Digit].Image.Width;
+            int w = digits[f.Digit].Image.Width;
             if (taken.Any(t => Math.Min(t.X + t.W, f.X + w) - Math.Max(t.X, f.X) > w / 2)) continue;
             taken.Add((f.X, w, f.Digit));
             if (taken.Count >= maxDigits) break;

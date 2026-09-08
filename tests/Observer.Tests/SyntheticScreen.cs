@@ -52,8 +52,10 @@ public static class SyntheticScreen
 
             if (gameCode is not null)
             {
+                // ⚠ **コードはラベルの「下の行」に描く。** 実画面がそうなっている
+                // （2026-09-08 に確認）。右に描くと、実物と違う形を試験してしまう
                 rects[CodeLabel] = Left(g, font, white, CodeLabel, 80, 860);
-                Left(g, font, white, gameCode, rects[CodeLabel].Right + 20, 860);
+                Left(g, font, white, gameCode, 80, rects[CodeLabel].Bottom + 6);
             }
 
             // **数字のテンプレートは同じ描き方で作る。** 別の描き方だと照合できない

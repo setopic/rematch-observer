@@ -39,7 +39,19 @@ public sealed class TemplateSet
     public int ReferenceHeight { get; init; } = 1080;
 
     public Dictionary<string, Template> Labels { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>リザルトの表の数字（太字）。</summary>
     public Dictionary<char, Template> Digits { get; } = new();
+
+    /// <summary>
+    /// ゲームコードの数字。**表とは別の字体である**（細身で、大きさも違う）。
+    /// ⚠ **縮めても橋渡しできない**（2026-09-08 に実画面で確認）。
+    ///
+    /// **揃っていなくてよい。** 足りない数字を含むコードは、
+    /// 読めないものとして捨てられるだけである（誤った値は入らない）。
+    /// 空なら <see cref="Digits"/> で代用する。
+    /// </summary>
+    public Dictionary<char, Template> CodeDigits { get; } = new();
 
     public bool HasLabels => Labels.ContainsKey(Home) && Labels.ContainsKey(Away)
                           && Labels.ContainsKey(TotalMatches) && Labels.ContainsKey(Goals);
@@ -78,8 +90,11 @@ public sealed class TemplateSet
         {
             var name = Path.GetFileNameWithoutExtension(path);
             var gray = Frame.LoadPng(path).ToGray();
-            if (name.StartsWith("digit-", StringComparison.Ordinal) && name.Length == 7
-                && char.IsAsciiDigit(name[6]))
+            if (name.StartsWith("code-digit-", StringComparison.Ordinal) && name.Length == 12
+                && char.IsAsciiDigit(name[11]))
+                set.CodeDigits[name[11]] = new Template(name, gray);
+            else if (name.StartsWith("digit-", StringComparison.Ordinal) && name.Length == 7
+                     && char.IsAsciiDigit(name[6]))
                 set.Digits[name[6]] = new Template(name, gray);
             else
                 set.Labels[name] = new Template(name, gray);

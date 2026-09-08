@@ -97,6 +97,11 @@ public sealed class Config
     /// <summary>`ゲームコード:` のラベルの高さに対する、数字を探す幅の倍率。</summary>
     public double CodeWidthScale { get; set; } = 8.0;
 
+    /// <summary>
+    /// 同じく高さの倍率。⚠ **コードはラベルの「下の行」にある**（実画面で確認）。
+    /// </summary>
+    public double CodeHeightScale { get; set; } = 1.8;
+
     // ---- 黄色の縁取り（detectSide が true のときだけ使う） ------------------
     // ⚠ **緑の背景は使わない。**あれはゲーム内で選択している選手に付くもので、
     // **運営の観戦では他人の行に付く**（CON-09）。
