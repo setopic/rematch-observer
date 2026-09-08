@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- ⚠ **WinExe にするのは、引数なしで画面を出すためである。**
+         コンソールの exe だと、二重起動のたびに黒い窓が出る。
+         **CLI は捨てていない。** 引数があれば呼び出した端末に繋ぎ直す（Gui.Attach） -->
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
     <!-- WGC（Windows.Graphics.Capture）を使うので Windows 10 1903 以降の投影が要る。
          配信ソフトと同じ経路で、ゲームのウィンドウだけを撮る（ADR-0067）。 -->
     <TargetFramework>net9.0-windows10.0.22621.0</TargetFramework>

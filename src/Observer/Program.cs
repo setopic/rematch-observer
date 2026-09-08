@@ -15,6 +15,8 @@ public static class Program
     private const string Usage = """
         rematch-observer — Rematch の画面を読んで、数字だけを Discord の Webhook に送ります。
 
+        **引数なしで起動すると画面が出ます。**以下は校正と確認のためのものです。
+
           windows                          撮れるウィンドウを並べる
           capture [--out <png>] [--delay <秒>] [--count <枚>] [--interval <秒>]
                                            ゲームのウィンドウを保存する
@@ -27,7 +29,7 @@ public static class Program
           read  --in <png>                 その画像から値を読む（送らない）
           send  --code <6 桁> | --score <ホーム> <アウェイ>
                                            1 通だけ送る（疎通の確認）
-          watch                            常駐する（既定）
+          watch                            常駐する
           check                            設定とテンプレートの状態を見る
           config-init                      設定ファイルの雛形を作る
 
@@ -39,9 +41,22 @@ public static class Program
           --dry-run         送らずに本文だけ出す
         """;
 
-    public static async Task<int> Main(string[] args)
+    /// <summary>
+    /// **引数が無ければ画面を出す**（普段動かす人はこちら）。
+    /// **引数があれば従来どおりのコマンド**（校正と確認はこちら）。
+    /// </summary>
+    [STAThread]
+    public static int Main(string[] args)
     {
+        if (args.Length == 0) return Gui.Run(new Args(args).ConfigPath);
+        // ⚠ **WinExe なので、黙っていると端末に何も出ない。**繋ぎ直す
+        Gui.Attach();
         try { Console.OutputEncoding = Encoding.UTF8; } catch (IOException) { /* 出力先による */ }
+        return RunAsync(args).GetAwaiter().GetResult();
+    }
+
+    private static async Task<int> RunAsync(string[] args)
+    {
         var a = new Args(args);
         string command = a.Command ?? "watch";
         try
