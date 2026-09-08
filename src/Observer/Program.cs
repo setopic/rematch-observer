@@ -16,7 +16,9 @@ public static class Program
         rematch-observer — Rematch の画面を読んで、数字だけを Discord の Webhook に送ります。
 
           windows                          撮れるウィンドウを並べる
-          capture [--out <png>]            ゲームのウィンドウを 1 枚保存する
+          capture [--out <png>] [--delay <秒>] [--count <枚>] [--interval <秒>]
+                                           ゲームのウィンドウを保存する
+                                           （--delay で待ってから、--count で続けて）
           crop --in <png> --rect x,y,w,h --out <png>
                                            テンプレートを切り出す
           match --in <png>                 その画像でラベルがどこに当たるかを見る
@@ -90,14 +92,43 @@ public static class Program
         var c = a.Config();
         var window = Target(a, c);
         Console.WriteLine($"対象: {window}");
-        var frame = await Grab(window);
-        if (frame is null) { Console.Error.WriteLine("撮れませんでした"); return 1; }
+
+        // **結果の画面は試合が終わった直後にしか出ない。**
+        // コマンドを打つには別のウィンドウに移る必要があるので、
+        // **打ってからゲームに戻る時間**と、**何枚か続けて撮る**手段が要る。
+        int delay = Number(a.Value("--delay"), 0);
+        int count = Math.Max(1, Number(a.Value("--count"), 1));
+        int interval = Math.Max(1, Number(a.Value("--interval"), 3));
         var outPath = a.Value("--out") ?? $"capture-{DateTime.Now:yyyyMMdd-HHmmss}.png";
-        frame.SavePng(outPath);
-        Console.WriteLine($"{frame.Width}x{frame.Height} を {Path.GetFullPath(outPath)} に保存しました");
+
+        for (int left = delay; left > 0; left--)
+        {
+            if (left == delay) Console.WriteLine("ゲームの画面に戻ってください");
+            Console.Write($"\r  あと {left} 秒  ");
+            await Task.Delay(1000);
+        }
+        if (delay > 0) Console.WriteLine();
+
+        for (int i = 1; i <= count; i++)
+        {
+            var frame = await Grab(window);
+            if (frame is null) { Console.Error.WriteLine("撮れませんでした"); return 1; }
+            var path = count == 1 ? outPath : Numbered(outPath, i);
+            frame.SavePng(path);
+            Console.WriteLine($"{i}/{count}  {frame.Width}x{frame.Height} → {Path.GetFullPath(path)}");
+            if (i < count) await Task.Delay(interval * 1000);
+        }
         Console.WriteLine("⚠ この画像は送られません。テンプレートを切り出すために手元に置くだけです");
+        Console.WriteLine("⚠ 選手名が写ります。リポジトリに入れないでください");
         return 0;
     }
+
+    private static int Number(string? text, int fallback)
+        => int.TryParse(text, out int value) ? value : fallback;
+
+    private static string Numbered(string path, int index)
+        => Path.Combine(Path.GetDirectoryName(path) ?? "",
+                        $"{Path.GetFileNameWithoutExtension(path)}-{index:D2}{Path.GetExtension(path)}");
 
     private static async Task<Frame?> Grab(WindowInfo window)
     {
