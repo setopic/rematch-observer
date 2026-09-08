@@ -99,7 +99,16 @@ Rematch のアンチチートは **Easy Anti-Cheat** です。**外部プロセ�
 rematch-observer.exe config-init
 ```
 
-`%APPDATA%\rematch-observer\config.json` ができます。最低限、次の 2 つを書きます。
+**exe の隣に `config.json` ができます。** 最低限、次の 2 つを書きます。
+
+**配ったフォルダの中で完結します。** 設定もテンプレートも同じ場所にあるので、
+**渡すのもフォルダごと、消すのもフォルダごとです。**
+
+⚠ **exe を `Program Files` に置くと、隣に書けないことがあります。**
+展開したフォルダのまま使うか、`--config` で場所を指してください。
+
+（以前の `%APPDATA%\rematch-observer\config.json` も読みます。
+**先にそちらへ書いた設定は、そのまま使えます。**）
 
 | 項目 | 何を書くか |
 | --- | --- |

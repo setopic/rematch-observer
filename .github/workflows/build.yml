@@ -60,10 +60,31 @@ jobs:
           & publish/rematch-observer.exe help
           if ($LASTEXITCODE -ne 0) { throw "help が失敗しました" }
 
+      - name: 配る形にまとめる
+        shell: pwsh
+        run: |
+          # ⚠ **exe だけを配らない。** テンプレートが無いと画面を読めないので、
+          # **exe だけ受け取った人は「何も起きない」という形で詰まる。**
+          # **必ず 1 つの zip にして、片方だけ落とせないようにする。**
+          New-Item -ItemType Directory -Force bundle/rematch-observer | Out-Null
+          Copy-Item publish/rematch-observer.exe bundle/rematch-observer/
+          Copy-Item -Recurse templates bundle/rematch-observer/templates
+          Copy-Item README.md bundle/rematch-observer/
+          Copy-Item LICENSE bundle/rematch-observer/
+          Compress-Archive -Path bundle/rematch-observer -DestinationPath rematch-observer.zip
+
+      - name: テンプレートが入っているかを確かめる
+        shell: pwsh
+        run: |
+          # **数え違いを機械に見張らせる。** ラベル 5 + 数字 10 + コードの数字 10
+          $png = (Get-ChildItem bundle/rematch-observer/templates -Filter *.png).Count
+          "テンプレート $png 枚"
+          if ($png -ne 25) { throw "テンプレートの枚数が合いません（25 枚のはず）" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: rematch-observer
-          path: publish/rematch-observer.exe
+          path: rematch-observer.zip
 
   release:
     needs: build
@@ -80,9 +101,35 @@ jobs:
       - name: Release に載せる
         uses: softprops/action-gh-release@v2
         with:
-          files: publish/rematch-observer.exe
+          files: publish/rematch-observer.zip
           body: |
-            `rematch-observer.exe` は**前提の要らない単一 exe**です（.NET の導入は要りません）。
+            `rematch-observer.zip` を展開して、**中身をそのまま 1 つのフォルダに置いてください。**
+
+            ```
+            rematch-observer/
+              rematch-observer.exe
+              templates/          ← 画面を読むための画像。**別々にしないでください**
+              config.json         ← `config-init` がここに作ります
+              README.md
+            ```
+
+            ⚠ **`templates/` を exe と同じ場所に置かないと、何も読めません。**
+            エラーも出ず、ただ何も起きない形で詰まります。
+
+            **.NET の導入は要りません**（前提の要らない単一 exe）。
+
+            **使う前に 2 つ設定します。**
+
+            ```
+            rematch-observer.exe config-init
+            rematch-observer.exe check
+            ```
+
+            `config.json` に **Webhook の URL**（運営から渡されます）と
+            **自分の Discord のユーザー id** を書いてください。
+            `check` が「設定もテンプレートも揃っています」と言えば準備完了です。
+
+            ⚠ **画面は 1920x1080 以上で遊んでください。** それより低いと読めません。
 
             ⚠ **コード署名がありません。** 初回の起動時に SmartScreen の警告が出ます。
             **署名の代わりにソースを公開しています。** 中身は `src/` で確かめられます。

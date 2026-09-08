@@ -143,9 +143,33 @@ public sealed class Config
 
     // ---- 置き場所と読み書き ------------------------------------------------
 
-    public static string DefaultPath => Path.Combine(
+    /// <summary>exe の隣。**配布した 1 フォルダの中で完結する**ので、こちらを既定にする。</summary>
+    public static string BesideExe => Path.Combine(AppContext.BaseDirectory, "config.json");
+
+    /// <summary>以前の置き場所。**すでに書いた人の設定を捨てないために見る。**</summary>
+    public static string InAppData => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "rematch-observer", "config.json");
+
+    /// <summary>
+    /// 設定ファイルの場所。
+    ///
+    /// **exe の隣を先に見る。** 展開したフォルダごと渡せて、**消すのもフォルダごとで済む。**
+    /// **`templates/` と同じ考え方である。**
+    ///
+    /// ⚠ **%APPDATA% にあるものも読む。** 先にそちらへ書いた人の設定を、
+    /// **黙って無視して「未設定」に見せない。**
+    /// ⚠ **exe を Program Files に置くと、隣に書けないことがある。**
+    /// そのときは `--config` で場所を指すか、書ける所に置くこと。
+    /// </summary>
+    public static string DefaultPath
+    {
+        get
+        {
+            if (File.Exists(BesideExe)) return BesideExe;
+            return File.Exists(InAppData) ? InAppData : BesideExe;
+        }
+    }
 
     private static readonly JsonSerializerOptions Json = new()
     {

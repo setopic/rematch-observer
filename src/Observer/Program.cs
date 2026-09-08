@@ -32,7 +32,7 @@ public static class Program
           config-init                      設定ファイルの雛形を作る
 
         共通のもの
-          --config <path>   設定ファイル（既定: %APPDATA%\\rematch-observer\\config.json）
+          --config <path>   設定ファイル（既定: exe の隣の config.json）
           --window <名前>   プロセス名で相手を選ぶ（既定は設定の processName）
           --side home|away  送る側（既定は - ＝ 分からない）
           --match <id>      対戦 id（運営には要る。対戦表の #12 の数字）
