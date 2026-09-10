@@ -171,6 +171,8 @@ public sealed class MainForm : Form
 
         var problems = _config.Problems();
         foreach (var p in problems) Write("  ⚠ " + p);
+        // ⚠ **既定を変えても、すでに書かれた設定は変わらない**ので、画面でも言う
+        if (!_config.DetectSide) Write(Warnings.SideOff);
         bool ready = problems.Count == 0 && missing.Count == 0;
         Write(ready ? "揃っています。常駐を開始できます" : "まだ足りません");
         _start.Enabled = ready && _running is null;

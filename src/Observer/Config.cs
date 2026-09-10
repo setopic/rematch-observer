@@ -79,11 +79,20 @@ public sealed class Config
     public int StableReads { get; set; } = 3;
 
     /// <summary>
-    /// 黄色の縁取りから自分の側を読むか。**既定は読まない。**
-    /// ⚠ **側を間違えて送ると Bot が観測ごと捨てる**（UC-45 A3）ので、
-    /// **校正できていないうちは `-`（分からない）で送るほうが良い。**
+    /// 黄色の縁取りから自分の側を読むか。**既定で読む。**
+    ///
+    /// ⚠ **これは検算の材料ではない。得点の向きそのものである**（CON-09 / ADR-0071）。
+    /// **ゲームの `ホーム` と、Bot が持つ対戦のホームは別物**で、
+    /// **結びつける仕組みがどこにも無い**（ゲームの枠は選手が自分で選ぶ）。
+    ///
+    /// **送り主が画面のどちら側に居たか**だけが、両者を繋ぐ手がかりである。
+    /// **送らないと、Bot は対戦のホームに重ねるしかない**（検証されていない仮定）。
+    ///
+    /// ⚠ **読めなければ `-` を送る。** 縁取りの判定は
+    /// **反対側を大きく引き離していること**を求めるので、
+    /// **間違った側を送るより、分からないと言うほうに倒れる。**
     /// </summary>
-    public bool DetectSide { get; set; }
+    public bool DetectSide { get; set; } = true;
 
     /// <summary>
     /// `ゴール` 列のラベルの幅に対する、読み取り枠の幅の倍率。
@@ -218,4 +227,16 @@ public sealed class Config
     }
 
     private static bool IsId(string s) => s.Length > 0 && s.All(char.IsAsciiDigit);
+}
+
+/// <summary>人に見せる注意書き。**画面とコマンドで同じ文を使う。**</summary>
+public static class Warnings
+{
+    /// <summary>
+    /// ⚠ **既定を変えても、すでに書かれた設定ファイルは変わらない。**
+    /// 古い版で作った人は `detectSide: false` のままなので、**気づけるように言う。**
+    /// </summary>
+    public const string SideOff =
+        "⚠ detectSide が false です。得点の向きが Bot 側の推測になります"
+        + "（config.json で true にしてください）";
 }

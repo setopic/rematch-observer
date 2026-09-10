@@ -368,6 +368,10 @@ public static class Program
                             + "watch は何も読めません（send は送れます）");
         else
             Console.WriteLine("設定もテンプレートも揃っています");
+
+        // ⚠ **既定を変えても、すでに書かれた設定は変わらない。**
+        // `detectSide: false` が書き込まれたままの人が残るので、道具の側から言う
+        if (!c.DetectSide) Console.WriteLine(Warnings.SideOff);
         return problems.Count == 0 && missing.Count == 0 ? 0 : 1;
     }
 

@@ -140,10 +140,15 @@ public class ReadingTests
     }
 
     [Fact]
-    public void 側は既定で読まない()
+    public void 縁取りが無ければ_分からないと言う()
     {
-        // ⚠ **側を間違えて送ると Bot が観測ごと捨てる**（UC-45 A3）。
-        // **校正できていないうちは `-` で送る**
+        // **既定で側を読む**（CON-09 / ADR-0071。**得点の向きがこれで決まる**）。
+        // ⚠ **読めないときに黙って片側を名乗らない。**
+        // **間違った側より「分からない」のほうが安全である**
+        // （送れば Bot は対戦のホームに重ねる。それは検証されていない仮定だが、
+        //   **でたらめな側を送れば確実に逆に入る**）。
+        Assert.True(new Config().DetectSide, "既定で側を読む");
+
         var built = SyntheticScreen.Build(homeGoals: 1, awayGoals: 0);
         var result = new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame);
         Assert.Equal(Side.Unknown, result!.Side);
