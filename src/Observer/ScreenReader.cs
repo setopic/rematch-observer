@@ -118,6 +118,8 @@ public sealed class ScreenReader
     /// オウンゴールは相手の得点を増やすだけで、自分の選手ゴールを減らさない。
     ///
     /// ⚠ **1 通りに定まったときだけ採る。** 両方成り立つなら捨てる。
+    ///
+    /// ⚠ **ただし引き分けは、入れ替えても同じ答えである。** 向きを決める必要が無い。
     /// </summary>
     private (int Home, int Away)? ReadScore(GrayImage image, Hit homeLabel,
                                             int homePlayerGoals, int awayPlayerGoals,
@@ -149,7 +151,13 @@ public sealed class ScreenReader
         if (!int.TryParse(one, out int x) || !int.TryParse(two, out int y)) return null;
 
         bool asIs = x >= homePlayerGoals && y >= awayPlayerGoals;
-        bool swapped = y >= homePlayerGoals && x >= awayPlayerGoals;
+        // ⚠ **入れ替えが別の答えになるのは、2 つの数が違うときだけである。**
+        // 同じ数だと下の 2 式がまったく同じ式になり、**「両方成り立つ」で必ず捨てる。**
+        // **引き分けが一度も送られない。** 2026-09-15 の大会で実際に起きた
+        // （同じ PC から見た 6 試合のうち、決着した 3 試合はすべて観測で入り、
+        //   引き分けの 3 試合はすべて人の報告になった）。
+        // **矛盾していれば asIs も偽になるので、引き分けでも捨てる。**
+        bool swapped = x != y && y >= homePlayerGoals && x >= awayPlayerGoals;
         if (asIs == swapped)
         {
             trace?.Invoke(asIs

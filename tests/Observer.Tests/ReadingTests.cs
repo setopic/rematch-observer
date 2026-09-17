@@ -104,6 +104,38 @@ public class ReadingTests
         Assert.Null(new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame));
     }
 
+    [Theory]
+    [InlineData(1, 1, 1, 1)]
+    [InlineData(0, 0, 0, 0)]
+    [InlineData(2, 2, 2, 2)]
+    [InlineData(1, 2, 2, 2)]   // オウンゴール込みの引き分け
+    public void 引き分けは向きを決めずに読む(int homeGoals, int awayGoals, int homeScore, int awayScore)
+    {
+        // ⚠ **引き分けでは、左右どちらに割り当てても不等式が同じ式になる。**
+        // 「向きが決まらない」で捨てると、**引き分けが一度も送られない。**
+        //
+        // **2026-09-15 の大会で実際に起きた。** 同じ PC から見た 6 試合のうち、
+        // **決着した 3 試合はすべて観測で入り、引き分けの 3 試合（1-1 / 0-0 / 2-2）は
+        // すべて人の報告になった。**
+        //
+        // **どちらに割り当てても答えは同じ**なので、向きを決める必要が無い
+        var built = SyntheticScreen.Build(homeGoals, awayGoals,
+                                          homeScore: homeScore, awayScore: awayScore);
+        var result = new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame);
+        Assert.NotNull(result);
+        Assert.Equal(homeScore, result!.HomeGoals);
+        Assert.Equal(awayScore, result.AwayGoals);
+    }
+
+    [Fact]
+    public void 引き分けでも_矛盾すれば捨てる()
+    {
+        // **向きを決めないのは、答えが 1 つだからである。** 数が合わないものまで通さない。
+        // 選手ゴールが 3 なのに得点が 1 は、読み違えている
+        var built = SyntheticScreen.Build(homeGoals: 3, awayGoals: 0, homeScore: 1, awayScore: 1);
+        Assert.Null(new ScreenReader(built.Templates, Tuned()).ReadResult(built.Frame));
+    }
+
     [Fact]
     public void ヘッダと選手ゴールが矛盾すれば捨てる()
     {
