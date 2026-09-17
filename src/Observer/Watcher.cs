@@ -140,7 +140,15 @@ public sealed class Watcher
         var line = Observation.Score(_config.BotUserId, _config.SenderDiscordId,
                                      result.HomeGoals, result.AwayGoals, result.Side, _config.MatchId);
         if (await SendAsync(line, ct)) { _sentResult = key; _sentResultAt = _now(); }
+        // ADR-0080 **側が読めなかった理由を手元に残す。数字だけで、Discord には送らない。**
+        // 縁取りが無い（観戦していた）のか、判定が厳しいのかを見分ける材料になる。
+        // **送った 1 回だけ出す。** 結果の画面が出ているあいだ 500 ms ごとに出すと埋もれる
+        if (result.Side == Side.Unknown) _log(SideUnknownNote(result));
     }
+
+    private static string SideUnknownNote(ResultReading result) => result.Outline is { } o
+        ? $"側が読めませんでした（黄色の縁取り: ホーム側 {o.Home} 画素 / アウェイ側 {o.Away} 画素）"
+        : "側を読んでいません（detectSide が false です）";
 
     private async Task<bool> SendAsync(string line, CancellationToken ct)
     {

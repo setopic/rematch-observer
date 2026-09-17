@@ -55,6 +55,20 @@ public class WatcherTests
     }
 
     [Fact]
+    public async Task 側が読めないときは縁取りの画素数を手元に出す()
+    {
+        // ADR-0080 **合成画面には縁取りが無い**ので、側は `-` になる
+        var built = SyntheticScreen.Build(homeGoals: 4, awayGoals: 0);
+        var (watcher, log) = Make(built.Templates);
+        for (int i = 0; i < 6; i++) await watcher.StepAsync(built.Frame);
+
+        var notes = log.Where(l => l.Contains("縁取り")).ToList();
+        Assert.Single(notes);                                           // 送った 1 回だけ
+        Assert.Matches(@"ホーム側 \d+ 画素 / アウェイ側 \d+ 画素", notes[0]);
+        Assert.DoesNotContain(Sent(log), l => l.Contains("画素"));      // 送る本文には入らない
+    }
+
+    [Fact]
     public async Task 同じルームコードを再送しない()
     {
         // ⚠ **Bot 側の `set_room_code` が毎回 `clear()` を呼ぶ。**

@@ -14,7 +14,12 @@ public static class SideText
     };
 }
 
-public sealed record ResultReading(int HomeGoals, int AwayGoals, Side Side)
+/// <param name="Outline">
+/// 側の判定に使った黄色の縁取りの画素数。**`detectSide` が false なら null。**
+/// **手元のログに出すためだけに持つ。送らない**（ADR-0080）。
+/// </param>
+public sealed record ResultReading(int HomeGoals, int AwayGoals, Side Side,
+                                   (int Home, int Away)? Outline = null)
 {
     public override string ToString() => $"ホーム {HomeGoals} - アウェイ {AwayGoals}（側: {Side.Wire()}）";
 }
@@ -103,8 +108,10 @@ public sealed class ScreenReader
         var score = ReadScore(image, home.Value, h.Value, a.Value, trace);
         if (score is null) return null;
 
-        var side = _c.DetectSide ? DetectSide(frame, image, homeBand, awayBand, trace) : Side.Unknown;
-        return new ResultReading(score.Value.Home, score.Value.Away, side);
+        var (side, outline) = _c.DetectSide
+            ? DetectSide(frame, image, homeBand, awayBand, trace)
+            : (Side.Unknown, null);
+        return new ResultReading(score.Value.Home, score.Value.Away, side, outline);
     }
 
     /// <summary>
@@ -284,10 +291,13 @@ public sealed class ScreenReader
     /// ⚠ **緑の背景を使わない。** あれはゲーム内で選択している選手に付くもので、
     /// **運営の観戦では他人の行に付く。** 使ってよいのは黄色の縁取りだけである。
     /// ⚠ **運営の観戦では縁取りが出ない。** そのときは Unknown のままにする。
-    /// ⚠ **側を間違えて送ると Bot が観測ごと捨てる**（UC-45 A3）。**迷ったら Unknown。**
+    /// ⚠ **側を間違えて送ると、Bot は逆向きに記録する**（ADR-0071 で A3 を廃止した）。**迷ったら Unknown。**
+    /// Unknown なら Bot が向きを推定し、知らせに注意書きを添える（ADR-0080）。
+    ///
+    /// **画素数も返す。** Unknown になった理由を手元のログで見分けるためである。
     /// </summary>
-    private Side DetectSide(Frame frame, GrayImage normalized, Rect homeBand, Rect awayBand,
-                            Action<string>? trace)
+    private (Side Side, (int Home, int Away)? Outline) DetectSide(
+        Frame frame, GrayImage normalized, Rect homeBand, Rect awayBand, Action<string>? trace)
     {
         double scale = frame.Height / (double)normalized.Height;
         int home = CountOutline(frame, Scale(homeBand, scale, frame));
@@ -300,12 +310,12 @@ public sealed class ScreenReader
         //
         // **本物の縁取りは行を一周する**ので、桁違いに多い（同じ実画面で 6196 対 32）。
         // **多いだけでなく、反対側を大きく引き離していることを求める。**
-        // ⚠ **迷ったら Unknown。** 側を間違えて送ると Bot が観測ごと捨てる（UC-45 A3）。
+        // ⚠ **迷ったら Unknown。** 側を間違えて送ると、Bot は逆向きに記録する。
         int floor = Math.Max(_c.OutlineMinPixels, 1);
         int more = Math.Max(home, away), less = Math.Min(home, away);
-        if (more < floor) return Side.Unknown;                          // 縁取りが出ていない
-        if (more < less * _c.OutlineDominance) return Side.Unknown;     // 差が足りない
-        return home > away ? Side.Home : Side.Away;
+        if (more < floor) return (Side.Unknown, (home, away));                        // 縁取りが出ていない
+        if (more < less * _c.OutlineDominance) return (Side.Unknown, (home, away));   // 差が足りない
+        return (home > away ? Side.Home : Side.Away, (home, away));
     }
 
     private static Rect Scale(Rect r, double s, Frame frame) => new Rect(
