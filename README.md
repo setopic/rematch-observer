@@ -374,7 +374,7 @@ Bot 側がコードを入れ直すたびに**両チームの準備完了を白�
 | `matchId` | （無し） | 見ている対戦。**運営には要る** |
 | `processName` | `RuntimeClient` | 撮る相手のプロセス名。⚠ **`Rematch` ではありません**（下記） |
 | `windowTitle` | （無し） | 絞り込むときだけ |
-| `pollIntervalMs` | `1500` | 何ミリ秒ごとに見るか |
+| `pollIntervalMs` | `500` | 1 枚読み終えてから次を撮るまで何ミリ秒待つか（下限 200） |
 | `templatesDir` | `templates` | テンプレートの置き場所 |
 | `labelThreshold` | `0.80` | ラベルの照合の厳しさ。**下げると静かに間違える** |
 | `digitThreshold` | `0.85` | 数字の照合の厳しさ |

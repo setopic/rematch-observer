@@ -13,7 +13,8 @@ namespace RematchObserver.Tests;
 [SupportedOSPlatform("windows10.0.19041.0")]
 public class WatcherTests
 {
-    private static (Watcher Watcher, List<string> Log) Make(TemplateSet templates, int stableReads = 2)
+    private static (Watcher Watcher, List<string> Log) Make(TemplateSet templates, int stableReads = 2,
+                                                             Func<DateTime>? now = null)
     {
         var config = new Config
         {
@@ -23,7 +24,7 @@ public class WatcherTests
             DigitThreshold = 0.85,
         };
         var log = new List<string>();
-        return (new Watcher(config, new ScreenReader(templates, config), null, log.Add), log);
+        return (new Watcher(config, new ScreenReader(templates, config), null, log.Add, now), log);
     }
 
     private static List<string> Sent(List<string> log)
@@ -100,5 +101,37 @@ public class WatcherTests
         await watcher.StepAsync(blank);
         for (int i = 0; i < 3; i++) await watcher.StepAsync(built.Frame);
         Assert.Single(Sent(log));
+    }
+
+    [Fact]
+    public async Task 結果の画面が1分消えていなければ_何周消えても次の試合とみなさない()
+    {
+        // ⚠ **周の数で数えない。** 1 周を 500 ms にすると、4 周は 2 秒しかない。
+        // 画面の切り替えや別のウィンドウに出たくらいで、**同じ結果を二度送ってしまう**
+        var clock = DateTime.UtcNow;
+        var built = SyntheticScreen.Build(homeGoals: 2, awayGoals: 1);
+        var (watcher, log) = Make(built.Templates, now: () => clock);
+        var blank = new Frame(600, 400, 600 * 4, new byte[600 * 400 * 4]);
+
+        for (int i = 0; i < 2; i++) await watcher.StepAsync(built.Frame);
+        for (int i = 0; i < 10; i++) { clock += TimeSpan.FromSeconds(5); await watcher.StepAsync(blank); }   // 10 周・50 秒
+        for (int i = 0; i < 2; i++) await watcher.StepAsync(built.Frame);
+        Assert.Single(Sent(log));
+    }
+
+    [Fact]
+    public async Task 結果の画面が1分以上消えていたら_同じ得点でも次の試合として送る()
+    {
+        // 前半と後半が同じ得点で終わることがある。**1 分空けば別の試合である**
+        var clock = DateTime.UtcNow;
+        var built = SyntheticScreen.Build(homeGoals: 2, awayGoals: 1);
+        var (watcher, log) = Make(built.Templates, now: () => clock);
+        var blank = new Frame(600, 400, 600 * 4, new byte[600 * 400 * 4]);
+
+        for (int i = 0; i < 2; i++) await watcher.StepAsync(built.Frame);
+        await watcher.StepAsync(blank);
+        clock += TimeSpan.FromSeconds(61);
+        for (int i = 0; i < 2; i++) await watcher.StepAsync(built.Frame);
+        Assert.Equal(2, Sent(log).Count);
     }
 }

@@ -22,6 +22,7 @@ public sealed class Watcher
     private readonly ScreenReader _reader;
     private readonly Webhook? _webhook;
     private readonly Action<string> _log;
+    private readonly Func<DateTime> _now;
 
     private string? _candidate;
     private int _candidateCount;
@@ -29,17 +30,25 @@ public sealed class Watcher
     private string? _sentCode;
     private string? _sentResult;
     private DateTime _sentResultAt = DateTime.MinValue;
-    private int _framesWithoutResult;
+    private DateTime _resultSeenAt = DateTime.MinValue;
 
     /// <summary>同じ結果をもう一度送れるようになるまでの間。**画面のちらつきで二重に送らない。**</summary>
     private static readonly TimeSpan ResultCooldown = TimeSpan.FromMinutes(3);
 
-    /// <summary>結果の画面が何周期消えたら「次の試合」とみなすか。</summary>
-    private const int ScreenGoneFrames = 4;
+    /// <summary>
+    /// 結果の画面がこれだけ出ていなければ、次に出た結果を「次の試合」とみなす。
+    ///
+    /// ⚠ **周の数では数えない。** 1 周の長さは pollIntervalMs で変わり、500 ms なら 4 周は 2 秒しかない。
+    /// 画面の切り替えくらいで、**同じ結果を二度送ってしまう。**
+    /// 試合と試合の間は 1 分より十分長い（本番の実測で中央 10 分）。
+    /// </summary>
+    private static readonly TimeSpan ScreenGoneFor = TimeSpan.FromMinutes(1);
 
-    public Watcher(Config config, ScreenReader reader, Webhook? webhook, Action<string> log)
+    public Watcher(Config config, ScreenReader reader, Webhook? webhook, Action<string> log,
+                   Func<DateTime>? now = null)
     {
         _config = config; _reader = reader; _webhook = webhook; _log = log;
+        _now = now ?? (() => DateTime.UtcNow);   // 試験から時計を渡せるように
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -96,11 +105,13 @@ public sealed class Watcher
         var result = _reader.ReadResult(frame);
         if (result is null)
         {
-            if (++_framesWithoutResult >= ScreenGoneFrames) _sentResult = null;   // 次の試合を塞がない
             _candidate = null; _candidateCount = 0;
             return;
         }
-        _framesWithoutResult = 0;
+        // **最後に結果を見てからの時間で決める。** 間にルームコードの画面が挟まっても、
+        // ウィンドウが消えていても同じように数えられる
+        if (_now() - _resultSeenAt >= ScreenGoneFor) _sentResult = null;   // 次の試合を塞がない
+        _resultSeenAt = _now();
         var key = $"score:{result.HomeGoals}:{result.AwayGoals}:{result.Side.Wire()}";
         if (Stable(key)) await SendResultAsync(result, key, ct);
     }
@@ -125,10 +136,10 @@ public sealed class Watcher
 
     private async Task SendResultAsync(ResultReading result, string key, CancellationToken ct)
     {
-        if (_sentResult == key && DateTime.UtcNow - _sentResultAt < ResultCooldown) return;
+        if (_sentResult == key && _now() - _sentResultAt < ResultCooldown) return;
         var line = Observation.Score(_config.BotUserId, _config.SenderDiscordId,
                                      result.HomeGoals, result.AwayGoals, result.Side, _config.MatchId);
-        if (await SendAsync(line, ct)) { _sentResult = key; _sentResultAt = DateTime.UtcNow; }
+        if (await SendAsync(line, ct)) { _sentResult = key; _sentResultAt = _now(); }
     }
 
     private async Task<bool> SendAsync(string line, CancellationToken ct)

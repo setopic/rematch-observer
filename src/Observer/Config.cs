@@ -44,7 +44,8 @@ public sealed class Config
     public string ProcessName { get; set; } = "RuntimeClient";
     public string? WindowTitle { get; set; }
 
-    public int PollIntervalMs { get; set; } = 1500;
+    /// <summary>1 周ごとの待ち（ミリ秒）。**撮って読み終えてから次を撮るまで**の間で、読む時間は含まない。</summary>
+    public int PollIntervalMs { get; set; } = 500;
 
     /// <summary>テンプレート画像の置き場所。exe からの相対でよい。</summary>
     public string TemplatesDir { get; set; } = "templates";
